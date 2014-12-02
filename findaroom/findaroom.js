@@ -6,10 +6,11 @@ var gCanvas = null;
 var Rooms = new Meteor.Collection("rooms");
 var Facilities = new Meteor.Collection("facilities");
 var Buildings = new Meteor.Collection("buildings");
-
+var Suggestions = new Meteor.Collection ("suggestions")
 var current_bldg; // this varibale will be initailed with the GPS
 var current_bldg_img;
-
+var Sugg = [];
+//var typing =0;
 //auto fill
 //   let's say the string is called "result"
 //   so it's
@@ -43,13 +44,13 @@ if (Meteor.isServer) {
       Rooms.insert( { bldg: "LWSN", floor: "B", room: "136", xpix: 398, ypix: 1000, popular: false } );
       Rooms.insert( { bldg: "LWSN", floor: "B", room: "134", xpix: 428, ypix: 1030, popular: true } );
       Rooms.insert( { bldg: "LWSN", floor: "B", room: "132", xpix: 434, ypix: 1080, popular: false } );
-      Rooms.insert( { bldg: "LWSN", floor : "B", room: "131", xpix: 304, ypix: 1183, popular: false } );
-      Rooms.insert({ bldg: "LWSN", floor: "B", room: "130", xpix: 397, ypix: 1130, popular: false } );
-      Rooms.insert({ bldg: "LWSN", floor: "B", room: "128", xpix: 397, ypix: 1275, popular: false } );
-      Rooms.insert({ bldg: "LWSN", floor: "B", room: "129", xpix: 303, ypix: 1235, popular: false } );
-      Rooms.insert({ bldg: "LWSN", floor: "B", room: "116", xpix: 395, ypix: 1520, popular: true } );
-      Rooms.insert({ bldg: "LWSN", floor: "B", room: "105", xpix: 219, ypix: 1457, popular: false } );
-      Rooms.insert({ bldg: "LWSN", floor: "B", room: "107", xpix: 250, ypix: 1458, popular: false } );
+      Rooms.insert( { bldg: "LWSN", floor: "B", room: "131", xpix: 304, ypix: 1183, popular: false } );
+      Rooms.insert( { bldg: "LWSN", floor: "B", room: "130", xpix: 397, ypix: 1130, popular: false } );
+      Rooms.insert( { bldg: "LWSN", floor: "B", room: "128", xpix: 397, ypix: 1275, popular: false } );
+      Rooms.insert( { bldg: "LWSN", floor: "B", room: "129", xpix: 303, ypix: 1235, popular: false } );
+      Rooms.insert( { bldg: "LWSN", floor: "B", room: "116", xpix: 395, ypix: 1520, popular: true } );
+      Rooms.insert( { bldg: "LWSN", floor: "B", room: "105", xpix: 219, ypix: 1457, popular: false } );
+      Rooms.insert( { bldg: "LWSN", floor: "B", room: "107", xpix: 250, ypix: 1458, popular: false } );
 
     }
     if(Facilities.find().count() == 0) {
@@ -90,10 +91,12 @@ function restroom()
 
 function autofill_room(result)
 {
+  Sugg = [];
   var rs;
   var auto = [];
+  var count = 0;
     current_bldg=Session.get("bldg");
- for (counter=0;;counter++)
+ for (counter=0;counter < 5;counter++)
     {
   if(result.length == 1)
    rs = Rooms.findOne( { bldg: current_bldg, floor: result, popular: true }, {skip:counter, _id: 0, floor: 1, room: 1});
@@ -102,8 +105,22 @@ function autofill_room(result)
         if (rs==null) break;
          var string=rs.floor+rs.room;
         auto.push(string);
+        Sugg[count] = string;
+        count++;
     }
-    console.log(auto);
+    if(Sugg.length == 0)
+    {
+      Sugg[0] = "No Match Found";
+    }
+    if(result == "")
+    {
+      Sugg[0] = "";
+    }
+    Session.set("sugg", Sugg);
+    console.log(result);
+    //console.log(auto);
+    console.log(Sugg);
+    
     return auto;
 }
 
@@ -112,7 +129,7 @@ function initCanvas(w,h)
     gCanvas = document.getElementById("qr-canvas");
     gCanvas.style.width = w + "px";
     gCanvas.style.height = h + "px";
-    gCanvas.width = w;
+    gCanvas.width = w;$
     gCanvas.height = h;
     gCtx = gCanvas.getContext("2d");
     gCtx.clearRect(0, 0, w, h);
@@ -129,6 +146,7 @@ function load()
 if (Meteor.isClient) {
   // This code only runs on the client
 
+  
   Template.home.created = function(){
     if(Session.get("scan")==1)
       drawStuff();
@@ -140,6 +158,7 @@ if (Meteor.isClient) {
     Session.set("posY", -100);
     load();
   });
+  
   Meteor.setInterval(function() {
     navigator.geolocation.getCurrentPosition(function(position) {
 
@@ -162,7 +181,10 @@ if (Meteor.isClient) {
     scanned: function(){
       return Session.get("scan");
     },
-
+    
+    typed: function(){
+      return Session.get("typing");
+    },
     getPosX: function(){
       return posx*320/800+'px';
     },
@@ -189,6 +211,14 @@ if (Meteor.isClient) {
     },
     navReady: function(){
       return Session.get("navReady"); 
+    },
+    
+    getSuggestions: function(){
+      return Session.get("suggestions");
+    },
+    
+    getSugg: function(){
+      return Session.get("sugg");
     }
   });
 
@@ -271,6 +301,8 @@ if (Meteor.isClient) {
         Session.set("posY", -100);
         Session.set("navReady",0);
     },
+    
+    
     'blur .search-dest': function(){
         $(".fa-search")
           .css("color","rgb(231, 231, 231)");
@@ -347,8 +379,13 @@ if (Meteor.isClient) {
        // console.log( document.getElementById('search-main').value );
 
         autofill_room(document.getElementById('search-main').value);
+      
+        //console.log(Sugg.toString());
     },
-
+    
+    'keyup .suggestions': function(event){
+      Sugg.update();  
+    }
   });
   
 }
