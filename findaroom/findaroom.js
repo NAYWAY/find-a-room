@@ -342,15 +342,13 @@ if (Meteor.isClient) {
         return false;
     },
 
-    'keyup .search-dest': function(event) {
+   'keyup .search-dest': function(event) {
 
        // console.log( document.getElementById('search-main').value );
 
         autofill_room(document.getElementById('search-main').value);
     },
-
-  });
-  
+    
   'doubletap .hammerDiv': function(event) {
     alert("Double Tap!");
   },
