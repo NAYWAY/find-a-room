@@ -491,14 +491,14 @@ header .hide-completed {
 }
 
 .plus {
-    position: absolute;
+    position: fixed;
     top: 530px;
     left: 15px;
     z-index:200;
 }
 
 .minus {
-    position: absolute;
+    position: fixed;
     top: 530px;
     left: 45px;
     z-index:201;
