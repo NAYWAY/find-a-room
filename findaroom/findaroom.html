@@ -34,17 +34,32 @@
     <input type="text" name="text" style="text-align:center" placeholder="Or type your current location here" />
   </form>
   <canvas id="qr-canvas" width="800" height="600" style="display:none"></canvas>
-
+  
   {{else}}
 
+  <div class="navigation" style="top:{{navTop}}">
+    <div class="navigation-title">
+      <div class="fromPlace">B158</div>
+      <div class="from">from</div>
+      <div class="toPlace">B131</div>
+      <div class="to">to</div>
+      <div class="fromPoint"></div>
+      <div class="toPoint"></div>
+      <div class="dashline"></div>
+      <div class="closebtn"></div>
+    </div>
+    <div class="description">
+      <div class="nav-text">Walk stratight and turn right at room B154</div>
+      <button class="next-btn">Next</button>
+    </div>
+  </div>
+  
   <div class="topbar">
     <div class="title">{{current_building}}</div>
     <span class="fa fa-search fa-lg" style="color: rgb(231, 231, 231);top: 77px;position: absolute;z-index: 100;left: 15px;"></span>
     <button class = "backbtn" style="left:0px; position: absolute; z-index: 20; background-color: transparent; border:0px; padding: 33px 30px 20px 15px;">
       <span class="fa fa-angle-left fa-lg"></span>
     </button>
-    <!-- NOTE:: Gott, I add '<form class="new-task"> ' and '</form>' for showing the user possible destinations based on popularity-->
-    <!-- you can uncommend those two lines to check how it looks like -->  
   </div>
   <form class="search-dest">
         <input type="text" class="search-main" id="search-main" name="text" placeholder="where do you want to go?"/>
@@ -53,9 +68,24 @@
   <!-- <img src = {{current_map}} width="100%"/> -->
   <!-- <canvas id="map_canvas" width="800" height="1809"></canvas> -->
   <div class="hammerDiv">
+  
   <div class="mapbg" style="position: absolute">
+    
+    
+    
+    <div class="something" style="position: fixed; top: 105px">
+    {{#each getSugg}}
+        <button class="setDestination" style="background-color: rgba(255,255,255,0.93); border:0px; width:100%; padding-top:15px; padding-bottom: 15px;box-shadow: 0px 1px 1px 0px rgba(0,0,0,0.8);
+  -webkit-box-shadow: 0px 1px 1px 0px rgba(0,0,0,0.8);
+  -moz-box-shadow: 0px 1px 1px 0px rgba(0,0,0,0.8);
+  -webkit-appearance: none;margin: 0" id={{this}}>{{this}}</button>
+        
+    {{/each}}
+    </div>
+    
     <div class="mapoverlay" style="opacity: {{navReady}};"></div>
     <img src = {{current_map}} width="100%" />
+    <!--<canvas id="draw-line" width="100%" height="150%" style ="position:absolute; background-color: transparent;" ></canvas> -->
     <div class="point_container" style="top: {{getPosY}}; left: {{getPosX}}; position: absolute;">
       <img src="ic_location_history_24px.svg" width="125%" style="top:5px; width:20px; height:16px; left:4px; position:absolute; z-index:10"/>
       <div class="current_point" style="top:0px; left:0px;"></div>
@@ -66,32 +96,32 @@
       </div>
       -->
     </div>
-    
+
     {{#each getRestRoom}}
        <div class ="pee_point" style="top: {{ypix}};left: {{xpix}}"></div>
     {{/each}}
 
     <div class="point_container" style="top: {{getDesY}}; left: {{getDesX}}; position: absolute;
-                                        
-                                           
+
+
     -webkit-transition: all 0.2s ease-in-out;
   -moz-transition: all 0.2s ease-in-out;
   -o-transition: all 0.2s ease-in-out;
-  transition: all 0.2s ease-in-out;     
-                                        
+  transition: all 0.2s ease-in-out;
+
                                         ">
       <div class="dest_point" style="top:0px; left:0px"></div>
       <div class="dest_desc desc" >
         <a style="color: rgb(128, 157, 62); font-size: 13px">{{nameDes}}</a>
       </div>
     </div>
-    
+
     <div style="display:block; text-align:center; position: fixed; bottom:50px; width:100%;z-index: 100; opacity:{{navReady}};">
-        <button style="padding: 12px 25px; border-radius: 50px; border: 0px; background-color: rgba(255, 255, 255, 0.93); font-size:14px; font-weight: 700; color: rgb(87, 87, 87); font-family: Lato;  -webkit-box-shadow: 0px 1px 1px 0px rgba(0,0,0,0.1);
+        <button style="padding: 12px 25px; border-radius: 50px; border: 0px; background-color: rgba(74, 74, 74, 0.93);; font-size:14px; font-weight: 700; color: rgb(255, 255, 255); font-family: Lato;  -webkit-box-shadow: 0px 1px 1px 0px rgba(0,0,0,0.1);
   -moz-box-shadow: 0px 1px 1px 0px rgba(0,0,0,0.1);
   box-shadow: 0px 1px 1px 0px rgba(0,0,0,0.1);
   -webkit-appearance: none;
-  "><span class="fa fa-arrow-right fa-md startbtn"></span>Start Navigation</button>
+  " class="startnav"><span class="fa fa-arrow-right fa-md startbtn"></span>Start Navigation</button>
   </div>
   </div>
   </div>
@@ -101,5 +131,5 @@
 
 
   {{/unless}}
-
+  
 </template>
