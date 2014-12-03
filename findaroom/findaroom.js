@@ -8,18 +8,13 @@ var Rooms = new Meteor.Collection("rooms");
 var Facilities = new Meteor.Collection("facilities");
 var Buildings = new Meteor.Collection("buildings");
 var Lines = new Meteor.Collection("lines"); // for navigation.
+var Messages = new Meteor.Collection("messages"); // for public messages.
 var current_bldg; // this varibale will be initailed with the GPS
 var current_bldg_img;
-var Sugg = [];
 
-/*Meteor.defer(function(){
-  var Ham = ("testPinch");
-  Ham.on('hold tap swipe doubletap transformstart transform transformend dragstart drag dragend swipe release', function (event) {
-      event.preventDefault();
-      console.log("Type: " + event.type + ", Fingers: " + event.touches.length + ", Direction: " + event.direction + "<br/>");
-      });
-}
-)*/
+var helper = [];
+var toBeHelped = [];
+var Sugg = [];
 
 var mapcanvas = null;
     mapcontext = null;
@@ -27,11 +22,12 @@ var mapcanvas = null;
 
 var posx,posy;
 
+var instructions = [];
+
 if (Meteor.isServer) {
   Meteor.startup(function (){
     if(Buildings.find().count == 0) {
       Buildings.insert( { bldg: "LWSN", lowLatitude: 40.428189, highLatitude: 40.427397, lowLongitude: -86.917201, highLongitude:  -86.916739 } )
-      Buildings.insert( { bldg: "HICKS", lowLatitude: 40.428189, highLatitude: 40.427397, lowLongitude: -86.917201, highLongitude:  -86.916739 } )
 
       // 40.428189      40.427397           -86.916739,    -86.917201
       //say your GPS passes lat, log. The following should return the string. "LWSN"
@@ -44,7 +40,7 @@ if (Meteor.isServer) {
       Rooms.insert( { bldg: "LWSN", floor: "B", room: "153", xpix: 306, ypix: 490, popular: false } );
       Rooms.insert( { bldg: "LWSN", floor: "B", room: "151", xpix: 312, ypix: 635, popular: true } );
       Rooms.insert( { bldg: "LWSN", floor: "B", room: "148", xpix: 401, ypix: 666, popular: true } );
-      Rooms.insert( { bldg: "LWSN", floor: "B", room: "146", xpix: 401, ypix: 705, popular: true } );
+      Rooms.insert( { bldg: "LWSN", floor: "B", room: "146", xpix: 401, ypix: 755, popular: true } );
       Rooms.insert( { bldg: "LWSN", floor: "B", room: "138", xpix: 392, ypix: 924, popular: false } );
       Rooms.insert( { bldg: "LWSN", floor: "B", room: "136", xpix: 398, ypix: 1000, popular: false } );
       Rooms.insert( { bldg: "LWSN", floor: "B", room: "134", xpix: 428, ypix: 1030, popular: true } );
@@ -53,8 +49,8 @@ if (Meteor.isServer) {
       Rooms.insert({ bldg: "LWSN", floor: "B", room: "130", xpix: 397, ypix: 1130, popular: false } );
       Rooms.insert({ bldg: "LWSN", floor: "B", room: "128", xpix: 397, ypix: 1275, popular: false } );
       Rooms.insert({ bldg: "LWSN", floor: "B", room: "129", xpix: 303, ypix: 1235, popular: false } );
-      Rooms.insert({ bldg: "LWSN", floor: "B", room: "116", xpix: 395, ypix: 1420, popular: true } );
-      Rooms.insert({ bldg: "LWSN", floor: "B", room: "105", xpix: 219, ypix: 1457, popular: false } );
+      Rooms.insert({ bldg: "LWSN", floor: "B", room: "116", xpix: 395, ypix: 1700, popular: true } );
+      Rooms.insert({ bldg: "LWSN", floor: "B", room: "105", xpix: 219, ypix: 1500, popular: false } );
       Rooms.insert({ bldg: "LWSN", floor: "B", room: "107", xpix: 250, ypix: 1458, popular: false } );
 
     }
@@ -69,14 +65,24 @@ if (Meteor.isServer) {
     }
     if(Lines.find().count() == 0) {
         Lines.insert( { bldg: "LWSN", floor: "B", xpix: 88, ypix: 1486, description: "You should see the exit" });
-        Lines.insert( { bldg: "LWSN", floor: "B", xpix: 354, ypix: 1486, description: "You should see Room 116" });
+        Lines.insert( { bldg: "LWSN", floor: "B", xpix: 354, ypix: 1486, description: "You should see Room 116 " });
         Lines.insert( { bldg: "LWSN", floor: "B", xpix: 354, ypix: 37, description: "You should see a vending machine" });
         Lines.insert( { bldg: "LWSN", floor: "B", xpix: 487, ypix: 37, description: "You should see the exit" });
     }
   })
 }
 
+
+function getPointPercent(p) //get a point and return the percentage.
+{
+    var x = p.xpix/761;
+    var y = p.ypix/1761;
+    var pointPer={xper:x, yper:y};
+    return pointPer;
+}
+
 // function finding a point () say given a point p {int xpix, int ypix}
+
 function closestNode(p)
 {
     var l;
@@ -118,8 +124,8 @@ function restroom()
 //    alert(current.ypix);
 
     locations_coordinate.push(
-        {"xpix":current.xpix*320/800+"px",
-         "ypix":current.ypix*320/800+"px"
+        {"xpix":current.xpix*window.innerWidth/(800/(parseInt(Session.get("width"))/100))+'px',
+         "ypix":current.ypix*window.innerWidth/(800/(parseInt(Session.get("width"))/100))+'px'
         })
     }
    // alert(locations_coordinate[0].xpix);
@@ -137,23 +143,24 @@ function make_point(x,y)
     return coordinate;
 }
 
-function on_the_line(x1,y1,x2,y2,x3,y3) //check if (x3,y3) is on segment (x1,y1), (x2,y2) now only for straight line
+function on_the_line(x1,y1,x2,y2,x3,y3) //check if (x3,y3) is on segment (x1,y1), (x2,y2) ..now only for straight line
 {
+    console.log(x1,y1,x2,y2,x3,y3);
     if ((x3==x1) && (x3==x2))
     {
         yhat1=y3-y1;
         yhat2=y3-y2;
-        
-        alert(yhat1*yhat2);
+
+//        alert(yhat1*yhat2);
         if (yhat1*yhat2<0)
             return true;
     }
-    
+
     if ((y3==y1) && (y3==y2))
     {
         xhat1=x3-x1;
         xhat2=x3-x2;
-        alert(xhat1*xhat2);
+      //  alert(xhat1*xhat2);
         if (xhat1*xhat2<0)
             return true;
     }
@@ -164,7 +171,7 @@ function on_the_line(x1,y1,x2,y2,x3,y3) //check if (x3,y3) is on segment (x1,y1)
 
 function check_the_turn(x0,y0,x1,y1,x2,y2) //1 left -1  right
 {
-    ans=(x1-x0)*(y2-y0)-(x2-x0)*(y1-y0);   
+    ans=(x1-x0)*(y2-y0)-(x2-x0)*(y1-y0);
     if (ans>0) return 1;
     if (ans==0) return 0;
     if (ans<0) return -1;
@@ -173,75 +180,93 @@ function find_destination(startx,starty,endx,endy)
 {
     start_point=make_point(startx,starty);
     end_point=make_point(endx,endy);
-    
+
     console.log(start_point.xpix);
-    
+
     startx=closestNode(start_point)[0].xpix;
     starty=closestNode(start_point)[0].ypix;
-    
+
     endx=closestNode(end_point)[0].xpix;
     endy=closestNode(end_point)[0].ypix;
-    
-    
-    
+
+
+
     var queue=[];
-    queue.push({coordinate:make_point(startx,starty),prev:0,distance:0});
-    
+    queue.push({xpix:startx,ypix:starty,prev:-1,distance:0});
+
     nowx=startx;
     nowy=starty;
     head=0;
     tail=0;
-    while (nowx!=endx && nowy!=endy)
+    flags=0;
+    
+    if ((startx==endx) && (starty==endy))
     {
+        queue.push({xpix:startx,ypix:starty,prev:0,distance:0});
+        tail=1;
+    }
+    else
+    //console.log(endx,endy);
+    while (1)
+    {
+        
+
         for (counter=0;;counter++)
         {
             var current=Lines.findOne({'$or': [ {'xpix':nowx ,'ypix' : {$ne : nowy} }, { 'ypix': nowy, 'xpix' : {$ne : nowx}}]} ,{skip:counter});  // nowx==xpix xor nowy==ypix
-                                               
+
                                     //make sure the x and y is the same in the future
             if (current==null) break;
             tail+=1;
             queue.push({xpix:current.xpix,ypix:current.ypix,prev:head,distance:queue[head].distance+1});
+            console.log(current.xpix,current.ypix);
+            if (current.xpix==endx && current.ypix==endy) 
+            {
+                console.log("yes find it!!");
+                flags=1;
+                break;
+            }
+            
         }
+        console.log(queue);
+        if (flags==1) break;
         head+=1;
         nowx=queue[head].xpix;
-        nowy=queue[tail].ypix;
+        nowy=queue[head].ypix;
     }
-    
+
     now=tail;
     point_list=[];
-    point_list.push({xpix:endx,ypix:endy});
     for (counter=0;;counter++)
     {
   //      alert("now "+now+" "+"xpix "+queue[now].xpix+"ypix "+queue[now].ypix);
-     
-        if (now==0)
+
+        if (now==-1)
             break;
         point_list.unshift({xpix:queue[now].xpix,ypix:queue[now].ypix});
         now=queue[now].prev;
-        
+
         //alert(now);
     }
-    point_list.unshift({xpix:startx,ypix:starty});
-    
 
-    
+
     length=point_list.length;
     flag=0;
-    
+    console.log(point_list,length);
     if ((length==2) && (point_list[0].xpix==point_list[1].xpix) && (point_list[0].ypix==point_list[1].ypix))
         flag=1;
-                                                                   
+
     if (on_the_line(point_list[0].xpix,point_list[0].ypix,point_list[1].xpix,point_list[1].ypix,closestNode(start_point)[1].xpix,closestNode(start_point)[1].ypix)==true || flag==1)
     {
         point_list[0].xpix=closestNode(start_point)[1].xpix;
         point_list[0].ypix=closestNode(start_point)[1].ypix;
-        
+
     }
     else
     {
         point_list.unshift({xpix:closestNode(start_point)[1].xpix,ypix:closestNode(start_point)[1].ypix});
     }
-    
+
     if (on_the_line(point_list[length-1].xpix,point_list[length-1].ypix,point_list[length-2].xpix,point_list[length-2].ypix,closestNode(end_point)[1].xpix,closestNode(end_point)[1].ypix)==true || flag==1)
     {
         point_list[length-1].xpix=closestNode(end_point)[1].xpix;
@@ -251,28 +276,35 @@ function find_destination(startx,starty,endx,endy)
     {
         point_list.push({xpix:closestNode(end_point)[1].xpix,ypix:closestNode(end_point)[1].ypix});
     }
-    
+
     //alert("nearest node"+closestNode(start_point)[1].xpix+"y: "+closestNode(start_point)[1].ypix);
-    
+
     point_list.unshift({xpix:start_point.xpix,ypix:start_point.ypix});
     point_list.push({xpix:end_point.xpix,ypix:end_point.ypix});
-    
+
+    instruction_list=[]
     for (i=1; i<point_list.length-1; i++)
     {
-       alert(point_list[i].xpix+"  "+point_list[i].ypix); //alert(check_the_turn(point_list[0].xpix,point_list[0].ypix,point_list[1].xpix,point_list[1].ypix,point_list[2].xpix,point_list[2].ypix));
-      if (check_the_turn(point_list[i-1].xpix,point_list[i-1].ypix,point_list[i].xpix,point_list[i].ypix,point_list[i+1].xpix,point_list[i+1].ypix)==-1)
-          string=" TURN FUCKING LEFT ";
-        else
-            string=" TURN FUCKING RIGHT ";
+       //alert(point_list[i].xpix+"  "+point_list[i].ypix); //alert(check_the_turn(point_list[0].xpix,point_list[0].ypix,point_list[1].xpix,point_list[1].ypix,point_list[2].xpix,point_list[2].ypix));
+        string=""
        if (Lines.findOne({xpix:point_list[i].xpix,ypix:point_list[i].ypix})!=null)
-         alert(Lines.findOne({xpix:point_list[i].xpix,ypix:point_list[i].ypix}).description+string);
+         string=Lines.findOne({xpix:point_list[i].xpix,ypix:point_list[i].ypix}).description+"then turn";
         else
             if (i==1)
-            alert("get the fuck out of here and"+string);
-        else alert("go fucking inside!!! You ARE DONE" +string);
+                string="Go to the hall way, go straight while make sure the room is on your ";
+            else string="The destination is on your " ;
+
+     if (check_the_turn(point_list[i-1].xpix,point_list[i-1].ypix,point_list[i].xpix,point_list[i].ypix,point_list[i+1].xpix,point_list[i+1].ypix)==-1)
+            string=string+"left";
+        else
+            string=string+"right";
+        instruction_list.push({xpix:point_list[i].xpix,ypix:point_list[i].ypix,instruction:string})
+
     }
-    
-    
+    console.log(instruction_list);
+    return instruction_list;
+
+
 }
 
 function autofill_room(result)
@@ -321,21 +353,20 @@ function load()
 
 function drawLine(x1, y1, x2, y2)
 {
-  gCanvas = document.getElementById("draw-line");
+  var ctx = document.getElementById("draw-line").getContext("2d");
   console.log("draw a line");
-  var ctx = gCanvas.getContext("2d");
   ctx.beginPath();
   ctx.moveTo(x1,y1);
   ctx.lineTo(x2,y2);
-  ctx.lineWidth = 5;
+  ctx.lineWidth = 3;
   ctx.strokeStyle = '#4780A6';
+  console.log("x1: "+x1+", y1: "+y1+", x2: "+x2+" y2: "+y2);
   ctx.stroke();
 }
 
 // simple-todos.js
 if (Meteor.isClient) {
   // This code only runs on the client
-  //find_destination(308,361,396,349);
   Template.home.created = function(){
     if(Session.get("scan")==1)
       drawStuff();
@@ -354,11 +385,14 @@ if (Meteor.isClient) {
   };
 
   Meteor.startup(function () {
+    Session.set("width", 100+"%");
     Session.set("posX", 160);
     Session.set("posY", -100);
+    Session.set("curY", -100);
+    Session.set("curX", 0);
     Session.set("navTop",-200+"px");
     load();
-    
+
   });
   Meteor.setInterval(function() {
     navigator.geolocation.getCurrentPosition(function(position) {
@@ -376,6 +410,10 @@ if (Meteor.isClient) {
     current_map: function(){
       return Session.get("mapimg");
     },
+
+    current_width: function(){
+      return Session.get("width");     
+    },
     current_building: function(){
       return Session.get("bldg");
     },
@@ -383,22 +421,25 @@ if (Meteor.isClient) {
       return Session.get("scan");
     },
 
+ 
     getPosX: function(){
-      return posx*320/800+'px';
+      return Session.get("curX")*window.innerWidth/(800/(parseInt(Session.get("width"))/100))+'px';
     },
     getPosY: function(){
-      return posy*320/800+'px';
+      return Session.get("curY")*window.innerWidth/(800/(parseInt(Session.get("width"))/100))+'px';
     },
 
     getRestRoom: function(){
-      return restroom();
+      if( Session.get("scan") ) 
+        return restroom();
+
     },
 
     getDesX: function(){
-      return Session.get("posX")*320/800+'px';
+      return Session.get("posX")*window.innerWidth/(800/(parseInt(Session.get("width"))/100))+'px';
     },
     getDesY: function(){
-      return Session.get("posY")*320/800+'px';
+      return Session.get("posY")*window.innerWidth/(800/(parseInt(Session.get("width"))/100))+'px';
     },
 
     nameCur: function(){
@@ -411,11 +452,15 @@ if (Meteor.isClient) {
       return Session.get("navReady");
     },
     navTop: function(){
-      return Session.get("navTop"); 
+      return Session.get("navTop");
     },
     getSugg: function(){
       if(Session.get("navReady") !== 1)
       return Session.get("sugg");
+    },
+    instruction: function(){
+      
+      return Session.get("current_ins");
     }
   });
 
@@ -423,7 +468,7 @@ if (Meteor.isClient) {
   Template.home.events({
     'click .scan-qr': function() {
 
-      MeteorCamera.getPicture({width: 320}, function(error, data) {
+      MeteorCamera.getPicture({width: window.innerWidth}, function(error, data) {
         if (error)
           alert(error.reason);
         else{
@@ -445,6 +490,7 @@ if (Meteor.isClient) {
                 Session.set("bldg", split[0]);
                 Session.set("mapimg", split[0]+"_"+split[1]+".jpg");
                 Session.set("location", split[2] );
+                
 
               }
           };
@@ -484,14 +530,17 @@ if (Meteor.isClient) {
         posy= response.ypix; // only know the room and floor
                 // Room.findOne( { bldg: b, fllor: f, room: r}, {_id:0,xpix:1}).xpix;
                 // Room.findOne( { bldg: b, fllor: f, room: r}, {_id:0,ypix:1}).ypix;
-
+      
+        Session.set("curX", posx);
+        Session.set("curY", posy);
         Session.set("bldg", response.bldg);
         Session.set("mapimg", response.bldg+"_"+response.floor+".jpg");
+        Session.set("current-width",800);
         Session.set("location", result );
         $( document ).ready(function() {
           console.log( "ready!" );
           $('html, body').animate({
-            scrollTop: (posy*320/800-50)+"px"
+            scrollTop: (posy*window.innerWidth/800-50)+"px"
           }, 800);
         });
         return false;
@@ -556,11 +605,11 @@ if (Meteor.isClient) {
             return false;
          }
 
-        psx= response.xpix;
-        psy= response.ypix;
+        posx2= response.xpix;
+        posy2= response.ypix;
 
-        Session.set("posX", psx);
-        Session.set("posY", psy);
+        Session.set("posX", posx2);
+        Session.set("posY", posy2);
         Session.set("destination", re );
         template.find(".search-main").blur();
         $("#search-main")
@@ -571,10 +620,10 @@ if (Meteor.isClient) {
         $( document ).ready(function() {
           console.log( "ready!" );
           $('html, body').animate({
-            scrollTop: (psy*320/800-50)+"px"
+            scrollTop: (posy2*window.innerWidth/800-50)+"px"
           }, 800);
         });
-        //drawLine(posx*320/800+'px', posy*320/800+'px', Session.get("posX")*320/800+'px', Session.get("posY")*320/800+'px')
+        //drawLine(posx/2.5, posy/8, posx2/2.5, posy2/8
         return false;
     },
 
@@ -584,10 +633,11 @@ if (Meteor.isClient) {
 
         autofill_room(document.getElementById('search-main').value);
     },
-    
+
     'click .startnav': function(event){
-        
-        
+
+        Session.set("width", 150+"%");
+      
         start=Session.get("location");
         dest=Session.get("destination");
         var f = start .charAt(0);
@@ -598,22 +648,47 @@ if (Meteor.isClient) {
         var r = dest.substring(1);
 
         var dest_document = Rooms.findOne( { room: r, floor: f });
-        find_destination(start_document.xpix,start_document.ypix,dest_document.xpix,dest_document.ypix);
+      
+        Session.set("step", 0);
+      
+        instructions = find_destination(start_document.xpix,start_document.ypix,dest_document.xpix,dest_document.ypix);
         
-        Session.set("navTop",0); 
+        Session.set("navTop",0);
         Session.set("navReady",0);
+        Sugg = [];
+        Session.set("sugg", Sugg);
+      
+        Session.set("current_ins", instructions[Session.get("step")].instruction  );
+        
+        console.log( (Session.get("curY")*window.innerWidth/(800/(parseInt(Session.get("width"))/100)) ));
+        console.log( (Session.get("curY")*window.innerWidth/(800/(parseInt(Session.get("width"))/100)) ));
+                    
+      
+        $( document ).ready(function() {
+          console.log( "ready!" );
+          $('html, body').animate({
+            scrollTop: (Session.get("curY")*window.innerWidth/(800/(parseInt(Session.get("width"))/100))-300)+"px",
+            scrollLeft: (Session.get("curX")*window.innerWidth/(800/(parseInt(Session.get("width"))/100))-150)+"px"
+          }, 400);
+        });
         
     },
-    
+
     'click .closebtn': function(event){
-        Session.set("navTop",-200+"px"); 
-    },
+        Session.set("navTop",-200+"px");
+        Session.set("width", 100+"%");
     
+    },
+    'click .next-btn': function(event){
+        i = Session.get("step");
+        Session.set("step",i+1);
+        Session.set("current_ins", instructions[i+1].instruction);
+    },
     'click .setDestination': function(event){
-      
-      
+
+
         var re = event.target.textContent;
-        
+
         var f = re.charAt(0);
         var r = re.substring(1);
 
@@ -634,38 +709,32 @@ if (Meteor.isClient) {
         $(".fa-search").css("color","rgb(195, 219, 137)").addClass("fa-check");;
         $("#search-main").val(re);
         Session.set("navReady",1);
-        
+
          $( document ).ready(function() {
           console.log( "ready!" );
           $('html, body').animate({
-            scrollTop: (psy*320/800-50)+"px"
+            scrollTop: (psy*window.innerWidth/800-50)+"px"
           }, 800);
         });
       
-    }, 
+    },
     
-  'doubletap .hammerDiv': function(event) {
-    alert("Double Tap!");
-  },
-  'hold .hammerDiv': function(event) {
-    alert("Hold!");
-  },
-  'pinchin .hammerDiv': function(event) {
-    alert("Pinch In!");
-  },
-  'pinchout .hammerDiv': function(event) {
-    alert("Pinch Out!");
-  },
-  'swiperight .hammerDiv': function(event) {
-    alert("Swipe Right!");
-  }
+    'click .plus' : function()
+    {
+        var zoom = parseInt(Session.get("width"));
+        console.log("Minus");
+        console.log(zoom);
+        Session.set("width", (zoom+10)+"%");
+    },
     
+    'click .minus' : function()
+    {
+        var zoom = parseInt(Session.get("width"));
+        console.log("Minus");
+        console.log(zoom);
+        Session.set("width", (zoom-10)+"%");
+    },
 
   });
-  
-  UI.body.rendered = function(){
-  $('body').hammer();
-  }
 
-  
 }
